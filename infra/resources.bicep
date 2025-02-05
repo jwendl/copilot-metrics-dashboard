@@ -47,6 +47,17 @@ var databaseName = 'platform-engineering'
 var orgContainerName = 'history'
 var metricsContainerName = 'metrics_history'
 var seatsContainerName = 'seats_history'
+var userManagedIdentityResourceId = subscriptionResourceId('Microsoft.ManagedIdentity/userAssignedIdentities', toLower('${name}-umi-${resourceToken}'))
+
+module sfi 'sfi.bicep' = {
+  name: 'sfi-deployment'
+  params: {
+    name: name
+    location: location
+    resourceToken: resourceToken
+    globalLocation: 'global'
+  }
+}
 
 resource appServicePlan 'Microsoft.Web/serverfarms@2020-06-01' = {
   name: appserviceName
@@ -76,10 +87,17 @@ resource copilotDataFunction 'Microsoft.Web/sites@2023-12-01' = {
   name: functionAppName
   tags: union(tags, { 'azd-service-name': 'ingestion' })
   kind: 'functionapp'
-  identity: { type: 'SystemAssigned' }
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${userManagedIdentityResourceId}': {}
+    }
+  }
   location: location
   properties: {
     serverFarmId: appServicePlan.id
+    virtualNetworkSubnetId: sfi.outputs.funSubnetResourceId
+    keyVaultReferenceIdentity: userManagedIdentityResourceId
     siteConfig: {
       alwaysOn: true
       linuxFxVersion: 'DOTNET-ISOLATED|8.0'
@@ -90,7 +108,23 @@ resource copilotDataFunction 'Microsoft.Web/sites@2023-12-01' = {
         }
         {
           name: 'AzureWebJobsStorage__accountname'
-          value: storage.name
+          value: functionsStorage.name
+        }
+        {          
+          name: 'AzureWebJobsStorage__clientId'          
+          value: sfi.outputs.userManagedIdentityClientId
+        }
+        {          
+          name: 'AzureWebJobsStorage__credential'          
+          value: 'managedidentity'
+        }
+        {
+          name: 'AzureWebJobsStorage__blobServiceUri'
+          value: 'https://${functionsStorage.name}.blob.${az.environment().suffixes.storage}'
+        }
+        {
+          name: 'AzureWebJobsStorage__queueServiceUri'
+          value: 'https://${functionsStorage.name}.queue.${az.environment().suffixes.storage}'
         }
         {
           name: 'FUNCTIONS_EXTENSION_VERSION'
@@ -133,12 +167,14 @@ resource copilotDataFunction 'Microsoft.Web/sites@2023-12-01' = {
   }
 }
 
-resource webApp 'Microsoft.Web/sites@2020-06-01' = {
+resource webApp 'Microsoft.Web/sites@2023-12-01' = {
   name: webappName
   location: location
   tags: union(tags, { 'azd-service-name': 'frontend' })
   properties: {
     serverFarmId: appServicePlan.id
+    virtualNetworkSubnetId: sfi.outputs.appSubnetResourceId
+    keyVaultReferenceIdentity: userManagedIdentityResourceId
     httpsOnly: true
     siteConfig: {
       linuxFxVersion: 'node|20-lts'
@@ -366,19 +402,30 @@ resource cosmosDbDataReader 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssign
   }
 }
 
-resource storage 'Microsoft.Storage/storageAccounts@2023-04-01' = {
+resource functionsStorage 'Microsoft.Storage/storageAccounts@2023-04-01' = {
   name: storageName
   kind: 'StorageV2'
   sku: { name: 'Standard_LRS' }
   location: location
   properties: {
     allowBlobPublicAccess: false
+    allowSharedKeyAccess: false
+    networkAcls: {
+      defaultAction: 'Deny'
+      bypass: 'AzureServices'
+      virtualNetworkRules: [
+        {
+          id: sfi.outputs.funStorageSubnetResourceId
+          action: 'Allow'
+        }
+      ]
+    }
   }
 }
 
 resource storageDataContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storage.id, copilotDataFunction.name, 'DataContributor')
-  scope: storage
+  name: guid(functionsStorage.id, copilotDataFunction.name, 'DataContributor')
+  scope: functionsStorage
   properties: {
     principalId: copilotDataFunction.identity.principalId
     principalType: 'ServicePrincipal'
