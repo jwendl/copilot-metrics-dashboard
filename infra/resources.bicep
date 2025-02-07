@@ -34,6 +34,11 @@ var logWorkspaceName = toLower('${name}-la-${resourceToken}')
 var appinsightsName = toLower('${name}-appi-${resourceToken}')
 var diagnosticSettingName = 'AppServiceConsoleLogs'
 
+var keyVaultPrivateEndpointName = toLower('${name}-kvpe-${resourceToken}')
+var keyVaultPrivateDnsZoneGroupName = toLower('${name}-kvpdns-${resourceToken}')
+var funBlobPrivateEndpointName = toLower('${name}-blobpe-${resourceToken}')
+var funBlobPrivateDnsZoneGroupName = toLower('${name}-blobpdns-${resourceToken}')
+
 var keyVaultSecretsOfficerRole = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
   'b86a8fe4-44ce-4948-aee5-eccb2c155cd7'
@@ -47,7 +52,7 @@ var databaseName = 'platform-engineering'
 var orgContainerName = 'history'
 var metricsContainerName = 'metrics_history'
 var seatsContainerName = 'seats_history'
-var userManagedIdentityResourceId = subscriptionResourceId('Microsoft.ManagedIdentity/userAssignedIdentities', toLower('${name}-umi-${resourceToken}'))
+var userManagedIdentityResourceId = resourceId(resourceGroup().name, 'Microsoft.ManagedIdentity/userAssignedIdentities', toLower('${name}-umi-${resourceToken}'))
 
 module sfi 'sfi.bicep' = {
   name: 'sfi-deployment'
@@ -83,7 +88,7 @@ var teamNameAppSettings = [
   }
 ]
 
-resource copilotDataFunction 'Microsoft.Web/sites@2023-12-01' = {
+resource copilotDataFunction 'Microsoft.Web/sites@2024-04-01' = {
   name: functionAppName
   tags: union(tags, { 'azd-service-name': 'ingestion' })
   kind: 'functionapp'
@@ -174,7 +179,6 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
   properties: {
     serverFarmId: appServicePlan.id
     virtualNetworkSubnetId: sfi.outputs.appSubnetResourceId
-    keyVaultReferenceIdentity: userManagedIdentityResourceId
     httpsOnly: true
     siteConfig: {
       linuxFxVersion: 'node|20-lts'
@@ -267,7 +271,7 @@ resource kvFunctionAppPermissions 'Microsoft.Authorization/roleAssignments@2020-
   name: guid(kv.id, copilotDataFunction.name, keyVaultSecretsOfficerRole)
   scope: kv
   properties: {
-    principalId: copilotDataFunction.identity.principalId
+    principalId: sfi.outputs.userManagedIdentityPrincipalId
     principalType: 'ServicePrincipal'
     roleDefinitionId: keyVaultSecretsOfficerRole
   }
@@ -277,7 +281,7 @@ resource kvWebAppPermissions 'Microsoft.Authorization/roleAssignments@2020-04-01
   name: guid(kv.id, webApp.name, keyVaultSecretsOfficerRole)
   scope: kv
   properties: {
-    principalId: webApp.identity.principalId
+    principalId: sfi.outputs.userManagedIdentityPrincipalId
     principalType: 'ServicePrincipal'
     roleDefinitionId: keyVaultSecretsOfficerRole
   }
@@ -286,6 +290,10 @@ resource kvWebAppPermissions 'Microsoft.Authorization/roleAssignments@2020-04-01
 resource kv 'Microsoft.KeyVault/vaults@2021-06-01-preview' = {
   name: keyVaultName
   location: location
+  tags: {
+    PurgeProtectionEnabledforAKV_Exemption: 'true'
+    VirtualNetworkEndPointAKV_Exemption: 'true'
+  }
   properties: {
     sku: {
       family: 'A'
@@ -296,6 +304,10 @@ resource kv 'Microsoft.KeyVault/vaults@2021-06-01-preview' = {
     enabledForDeployment: false
     enabledForDiskEncryption: true
     enabledForTemplateDeployment: false
+    networkAcls: {
+      bypass: 'AzureServices'
+      defaultAction: 'Deny'
+    }
   }
 
   resource GITHUB_TOKEN 'secrets' = {
@@ -402,7 +414,7 @@ resource cosmosDbDataReader 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssign
   }
 }
 
-resource functionsStorage 'Microsoft.Storage/storageAccounts@2023-04-01' = {
+resource functionsStorage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageName
   kind: 'StorageV2'
   sku: { name: 'Standard_LRS' }
@@ -410,15 +422,28 @@ resource functionsStorage 'Microsoft.Storage/storageAccounts@2023-04-01' = {
   properties: {
     allowBlobPublicAccess: false
     allowSharedKeyAccess: false
+    minimumTlsVersion: 'TLS1_2'
+    supportsHttpsTrafficOnly: true
+    encryption: {
+      keySource: 'Microsoft.Storage'
+      requireInfrastructureEncryption: true
+      services: {
+        blob: {
+          enabled: true
+          keyType: 'Account'
+        }
+        table: {
+          enabled: true
+          keyType: 'Account'
+        }
+      }
+    }
+    keyPolicy: {
+      keyExpirationPeriodInDays: 7
+    }
     networkAcls: {
       defaultAction: 'Deny'
       bypass: 'AzureServices'
-      virtualNetworkRules: [
-        {
-          id: sfi.outputs.funStorageSubnetResourceId
-          action: 'Allow'
-        }
-      ]
     }
   }
 }
@@ -427,9 +452,76 @@ resource storageDataContributor 'Microsoft.Authorization/roleAssignments@2022-04
   name: guid(functionsStorage.id, copilotDataFunction.name, 'DataContributor')
   scope: functionsStorage
   properties: {
-    principalId: copilotDataFunction.identity.principalId
+    principalId: sfi.outputs.userManagedIdentityPrincipalId
     principalType: 'ServicePrincipal'
     roleDefinitionId: storageDataWriterRole
+  }
+}
+
+
+resource keyVaultPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
+  name: keyVaultPrivateEndpointName
+  location: location
+  properties: {
+    subnet: {
+      id: sfi.outputs.vaultSubnetResourceId
+    }
+    privateLinkServiceConnections: [
+      {
+        name: 'KeyVaultPrivateLinkConnection'
+        properties: {
+          privateLinkServiceId: kv.id
+          groupIds: [ 'vault' ]
+        }
+      }
+    ]
+  }
+
+  resource keyVaultPrivateDnsZoneGroup 'privateDnsZoneGroups' = {
+    name: keyVaultPrivateDnsZoneGroupName
+    properties: {
+      privateDnsZoneConfigs: [
+        {
+          name: 'config'
+          properties: { privateDnsZoneId: sfi.outputs.vaultPrivateDnsZoneResourceId }
+        }
+      ]
+    }
+  }
+}
+
+resource storagePrivateEndpointBlob 'Microsoft.Network/privateEndpoints@2022-09-01' = {
+  name: funBlobPrivateEndpointName
+  location: location
+  properties: {
+    privateLinkServiceConnections: [
+      { 
+        name: 'BlobStoragePrivateLinkConnection'
+        properties: {
+          groupIds: [
+            'blob'
+          ]
+          privateLinkServiceId: functionsStorage.id
+        }
+      }
+    ]
+    subnet: {
+      id: sfi.outputs.funStorageSubnetResourceId
+    }
+  }
+
+  resource pvtEndpointDnsGroup 'privateDnsZoneGroups' = {
+    name: funBlobPrivateDnsZoneGroupName
+    properties: {
+      privateDnsZoneConfigs: [
+        {
+          name: 'ConfigStoragePrivateEndpoint'
+          properties: {
+            privateDnsZoneId: sfi.outputs.blobPrivateDnsZoneResourceId
+          }
+        }
+      ]
+    }
   }
 }
 

@@ -161,3 +161,6 @@ output vaultSubnetResourceId string = vnet.properties.subnets[1].id
 output appSubnetResourceId string = vnet.properties.subnets[4].id
 output funSubnetResourceId string = vnet.properties.subnets[5].id
 output funStorageSubnetResourceId string = vnet.properties.subnets[6].id
+
+output blobPrivateDnsZoneResourceId string = blobDnsZone.id
+output vaultPrivateDnsZoneResourceId string = kvDnsZone.id
