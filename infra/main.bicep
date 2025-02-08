@@ -22,8 +22,8 @@ param githubOrganizationName string
 param githubAPIScope string
 
 @secure()
-@description('PAT to call Github API')
-param githubToken string
+@description('GitHub App PEM File')
+param gitHubPemFile string
 
 @description('API version for the GitHub API e.g. 2022-11-28')
 @minLength(1)
@@ -56,7 +56,7 @@ module resources 'resources.bicep' = {
     resourceToken: resourceToken
     tags: tags
     location: location
-    githubToken: githubToken
+    gitHubPemFile: gitHubPemFile
     githubEnterpriseName: githubEnterpriseName
     githubOrganizationName: githubOrganizationName
     githubAPIVersion: githubAPIVersion

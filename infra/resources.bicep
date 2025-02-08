@@ -1,10 +1,10 @@
 param name string = 'azurechat-demo'
 param resourceToken string
 
-param location string = resourceGroup().location
-
 @secure()
-param githubToken string
+param gitHubPemFile string
+
+param location string = resourceGroup().location
 
 param githubEnterpriseName string
 
@@ -145,7 +145,7 @@ resource copilotDataFunction 'Microsoft.Web/sites@2024-04-01' = {
         }
         {
           name: 'GITHUB_TOKEN'
-          value: '@Microsoft.KeyVault(VaultName=${kv.name};SecretName=${kv::GITHUB_TOKEN.name})'
+          value: '@Microsoft.KeyVault(VaultName=${kv.name};SecretName=${kv::GITHUB_PEM.name})'
         }
         {
           name: 'GITHUB_ENTERPRISE'
@@ -201,7 +201,7 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
         }
         {
           name: 'GITHUB_TOKEN'
-          value: '@Microsoft.KeyVault(VaultName=${kv.name};SecretName=${kv::GITHUB_TOKEN.name})'
+          value: '@Microsoft.KeyVault(VaultName=${kv.name};SecretName=${kv::GITHUB_PEM.name})'
         }
         {
           name: 'GITHUB_ENTERPRISE'
@@ -310,11 +310,11 @@ resource kv 'Microsoft.KeyVault/vaults@2021-06-01-preview' = {
     }
   }
 
-  resource GITHUB_TOKEN 'secrets' = {
-    name: 'GITHUB-TOKEN'
+  resource GITHUB_PEM 'secrets' = {
+    name: 'GITHUB-PEM'
     properties: {
       contentType: 'text/plain'
-      value: githubToken
+      value: gitHubPemFile
     }
   }
 }

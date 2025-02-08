@@ -8,7 +8,7 @@
     "location": {
       "value": "${AZURE_LOCATION}"
     },
-    "githubToken": {
+    "gitHubPemFile": {
       "value": ""
     }
   }
