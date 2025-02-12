@@ -189,6 +189,12 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
   name: webappName
   location: location
   tags: union(tags, { 'azd-service-name': 'frontend' })
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${userManagedIdentityResourceId}': {}
+    }
+  }
   properties: {
     serverFarmId: appServicePlan.id
     virtualNetworkSubnetId: sfi.outputs.appSubnetResourceId
@@ -232,10 +238,13 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
           name: 'GITHUB_API_SCOPE'
           value: githubAPIScope
         }
+        {
+          name: 'USER_ASSIGNED_IDENTITY_CLIENT_ID'
+          value: sfi.outputs.userManagedIdentityClientId
+        }
       ]
     }
   }
-  identity: { type: 'SystemAssigned' }
 
   resource configLogs 'config' = {
     name: 'logs'
