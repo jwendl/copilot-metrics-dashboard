@@ -38,15 +38,28 @@ var keyVaultPrivateEndpointName = toLower('${name}-kvpe-${resourceToken}')
 var keyVaultPrivateDnsZoneGroupName = toLower('${name}-kvpdns-${resourceToken}')
 var funBlobPrivateEndpointName = toLower('${name}-blobpe-${resourceToken}')
 var funBlobPrivateDnsZoneGroupName = toLower('${name}-blobpdns-${resourceToken}')
+var cosmosPrivateEndpointName = toLower('${name}-cosmospe-${resourceToken}')
+var cosmosPrivateDnsZoneGroupName = toLower('${name}-cosmospdns-${resourceToken}')
 
-var keyVaultSecretsOfficerRole = subscriptionResourceId(
-  'Microsoft.Authorization/roleDefinitions',
-  'b86a8fe4-44ce-4948-aee5-eccb2c155cd7'
-)
-var storageDataWriterRole = subscriptionResourceId(
-  'Microsoft.Authorization/roleDefinitions',
-  'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
-)
+//'/${subscription().id}/resourceGroups/${resourceGroup().name}/providers/Microsoft.DocumentDB/databaseAccounts/${cosmosDbAccount.name}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002'
+resource cosmosDbReaderRoleDefinition 'Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions@2024-11-15' existing = {
+  parent: cosmosDbAccount
+  name: '00000000-0000-0000-0000-000000000001'
+}
+
+//'/${subscription().id}/resourceGroups/${resourceGroup().name}/providers/Microsoft.DocumentDB/databaseAccounts/${cosmosDbAccount.name}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000001'
+resource cosmosDbContributorRoleDefinition 'Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions@2024-11-15' existing = {
+  parent: cosmosDbAccount
+  name: '00000000-0000-0000-0000-000000000002'
+}
+
+resource keyVaultSecretsOfficerRoleDefinition 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
+  name: 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7'
+}
+
+resource storageDataWriterRoleDefinition 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
+  name: 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+}
 
 var databaseName = 'platform-engineering'
 var orgContainerName = 'history'
@@ -268,22 +281,22 @@ resource webDiagnosticSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01
 }
 
 resource kvFunctionAppPermissions 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = {
-  name: guid(kv.id, copilotDataFunction.name, keyVaultSecretsOfficerRole)
+  name: guid(kv.id, copilotDataFunction.name, keyVaultSecretsOfficerRoleDefinition.id)
   scope: kv
   properties: {
     principalId: sfi.outputs.userManagedIdentityPrincipalId
     principalType: 'ServicePrincipal'
-    roleDefinitionId: keyVaultSecretsOfficerRole
+    roleDefinitionId: keyVaultSecretsOfficerRoleDefinition.id
   }
 }
 
 resource kvWebAppPermissions 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = {
-  name: guid(kv.id, webApp.name, keyVaultSecretsOfficerRole)
+  name: guid(kv.id, webApp.name, keyVaultSecretsOfficerRoleDefinition.id)
   scope: kv
   properties: {
     principalId: sfi.outputs.userManagedIdentityPrincipalId
     principalType: 'ServicePrincipal'
-    roleDefinitionId: keyVaultSecretsOfficerRole
+    roleDefinitionId: keyVaultSecretsOfficerRoleDefinition.id
   }
 }
 
@@ -398,8 +411,8 @@ resource cosmosDbDataContributor 'Microsoft.DocumentDB/databaseAccounts/sqlRoleA
   name: guid(cosmosDbAccount.id, copilotDataFunction.name, 'DataContributor')
   parent: cosmosDbAccount
   properties: {
-    principalId: copilotDataFunction.identity.principalId
-    roleDefinitionId: '/${subscription().id}/resourceGroups/${resourceGroup().name}/providers/Microsoft.DocumentDB/databaseAccounts/${cosmosDbAccount.name}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002'
+    principalId: sfi.outputs.userManagedIdentityPrincipalId
+    roleDefinitionId: cosmosDbContributorRoleDefinition.id
     scope: cosmosDbAccount.id
   }
 }
@@ -408,8 +421,8 @@ resource cosmosDbDataReader 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssign
   name: guid(cosmosDbAccount.id, webApp.name, 'DataReader')
   parent: cosmosDbAccount
   properties: {
-    principalId: webApp.identity.principalId
-    roleDefinitionId: '/${subscription().id}/resourceGroups/${resourceGroup().name}/providers/Microsoft.DocumentDB/databaseAccounts/${cosmosDbAccount.name}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000001'
+    principalId: sfi.outputs.userManagedIdentityPrincipalId
+    roleDefinitionId: cosmosDbReaderRoleDefinition.id
     scope: cosmosDbAccount.id
   }
 }
@@ -454,7 +467,7 @@ resource storageDataContributor 'Microsoft.Authorization/roleAssignments@2022-04
   properties: {
     principalId: sfi.outputs.userManagedIdentityPrincipalId
     principalType: 'ServicePrincipal'
-    roleDefinitionId: storageDataWriterRole
+    roleDefinitionId: storageDataWriterRoleDefinition.id
   }
 }
 
@@ -490,7 +503,7 @@ resource keyVaultPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01'
   }
 }
 
-resource storagePrivateEndpointBlob 'Microsoft.Network/privateEndpoints@2022-09-01' = {
+resource storagePrivateEndpointBlob 'Microsoft.Network/privateEndpoints@2024-05-01' = {
   name: funBlobPrivateEndpointName
   location: location
   properties: {
@@ -518,6 +531,41 @@ resource storagePrivateEndpointBlob 'Microsoft.Network/privateEndpoints@2022-09-
           name: 'ConfigStoragePrivateEndpoint'
           properties: {
             privateDnsZoneId: sfi.outputs.blobPrivateDnsZoneResourceId
+          }
+        }
+      ]
+    }
+  }
+}
+
+resource cosmosPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
+  name: cosmosPrivateEndpointName
+  location: location
+  properties: {
+    privateLinkServiceConnections: [
+      { 
+        name: 'CosmosPrivateLinkConnection'
+        properties: {
+          groupIds: [
+            'sql'
+          ]
+          privateLinkServiceId: cosmosDbAccount.id
+        }
+      }
+    ]
+    subnet: {
+      id: sfi.outputs.cosmosDbSubnetResourceId
+    }
+  }
+
+  resource cosmosEndpointDnsGroup 'privateDnsZoneGroups' = {
+    name: cosmosPrivateDnsZoneGroupName
+    properties: {
+      privateDnsZoneConfigs: [
+        {
+          name: 'CosmosPrivateEndpoint'
+          properties: {
+            privateDnsZoneId: sfi.outputs.cosmosDbPrivateDnsZoneResourceId
           }
         }
       ]

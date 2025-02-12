@@ -117,12 +117,12 @@ resource blobVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@202
   }
 }
 
-resource tableDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+resource tableDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
   name: 'privatelink.table.${az.environment().suffixes.storage}'
   location: globalLocation
 }
 
-resource tableVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+resource tableVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
   parent: tableDnsZone
   name: 'table-vnet-link'
   location: globalLocation
@@ -134,14 +134,31 @@ resource tableVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@20
   }
 }
 
-resource queueDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+resource queueDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
   name: 'privatelink.queue.${az.environment().suffixes.storage}'
   location: globalLocation
 }
 
-resource queueVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+resource queueVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
   parent: queueDnsZone
   name: 'queue-vnet-link'
+  location: globalLocation
+  properties: {
+    registrationEnabled: false
+    virtualNetwork: {
+      id: vnet.id
+    }
+  }
+}
+
+resource cosmosDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
+  name: 'privatelink.documents.azure.com'
+  location: globalLocation
+}
+
+resource cosmosDnsVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
+  parent: cosmosDnsZone
+  name: 'cosmos-vnet-link'
   location: globalLocation
   properties: {
     registrationEnabled: false
@@ -158,9 +175,11 @@ output userManagedIdentityPrincipalId string = userManagedIdentity.properties.pr
 
 output virtualNetworkResourceId string = vnet.id
 output vaultSubnetResourceId string = vnet.properties.subnets[1].id
+output cosmosDbSubnetResourceId string = vnet.properties.subnets[2].id
 output appSubnetResourceId string = vnet.properties.subnets[4].id
 output funSubnetResourceId string = vnet.properties.subnets[5].id
 output funStorageSubnetResourceId string = vnet.properties.subnets[6].id
 
 output blobPrivateDnsZoneResourceId string = blobDnsZone.id
 output vaultPrivateDnsZoneResourceId string = kvDnsZone.id
+output cosmosDbPrivateDnsZoneResourceId string = cosmosDnsZone.id
