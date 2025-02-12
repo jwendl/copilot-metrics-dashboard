@@ -280,17 +280,7 @@ resource webDiagnosticSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01
   }
 }
 
-resource kvFunctionAppPermissions 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = {
-  name: guid(kv.id, copilotDataFunction.name, keyVaultSecretsOfficerRoleDefinition.id)
-  scope: kv
-  properties: {
-    principalId: sfi.outputs.userManagedIdentityPrincipalId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: keyVaultSecretsOfficerRoleDefinition.id
-  }
-}
-
-resource kvWebAppPermissions 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = {
+resource kvWebAppPermissions 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(kv.id, webApp.name, keyVaultSecretsOfficerRoleDefinition.id)
   scope: kv
   properties: {
