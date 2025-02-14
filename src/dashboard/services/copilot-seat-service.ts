@@ -12,6 +12,7 @@ import { cosmosClient, cosmosConfiguration } from "./cosmos-db-service";
 import { format } from "date-fns";
 import { SqlQuerySpec } from "@azure/cosmos";
 import { stringIsNullOrEmpty } from "../utils/helpers";
+import { GitHubTokenService } from "./copilot-token-service";
 
 export interface IFilter {
   date?: Date;
@@ -30,7 +31,9 @@ export const getCopilotSeats = async (
     return env;
   }
 
-  const { enterprise, organization, token, version } = env.response;
+  const { enterprise, organization, version } = env.response;
+  const gitHubTokenService = new GitHubTokenService(fetch);
+  const token: string = await gitHubTokenService.fetchTokenFromPem();
 
   try {
     switch (process.env.GITHUB_API_SCOPE) {
@@ -115,7 +118,9 @@ const getCopilotSeatsFromApi = async (
     return env;
   }
 
-  let { token, version } = env.response;
+  let { version } = env.response;
+  const gitHubTokenService = new GitHubTokenService(fetch);
+  const token: string = await gitHubTokenService.fetchTokenFromPem();
 
   try {
     if (filter.enterprise) { 
@@ -212,7 +217,9 @@ export const getCopilotSeatsManagement = async (
     return env;
   }
 
-  const { enterprise, organization, token, version } = env.response;
+  const { enterprise, organization, version } = env.response;
+  const gitHubTokenService = new GitHubTokenService(fetch);
+  const token: string = await gitHubTokenService.fetchTokenFromPem();
 
   try {
     switch (process.env.GITHUB_API_SCOPE) {
@@ -242,7 +249,9 @@ const getCopilotSeatsManagementFromApi = async (
     return env;
   }
 
-  let { enterprise, organization, token, version } = env.response;
+  let { enterprise, organization, version } = env.response;
+  const gitHubTokenService = new GitHubTokenService(fetch);
+  const token: string = await gitHubTokenService.fetchTokenFromPem();
 
   try {
     switch (process.env.GITHUB_API_SCOPE) {

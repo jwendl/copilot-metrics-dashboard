@@ -11,15 +11,21 @@ param location string
 
 @description('Name of GitHub enterprise')
 @minLength(1)
-param githubEnterpriseName string
+param gitHubEnterpriseName string
 
 @description('Name of GitHub Organization')
 @minLength(1)
-param githubOrganizationName string
+param gitHubOrganizationName string
 
 @description('GitHub API scope: "enterprise" or "organization"')
 @allowed(['enterprise', 'organization'])
-param githubAPIScope string
+param gitHubApiScope string
+
+@description('GitHub App Client Id')
+param gitHubClientId string
+
+@description('GitHub App Installation Id')
+param gitHubInstallationId string
 
 @secure()
 @description('GitHub App PEM File')
@@ -27,7 +33,7 @@ param gitHubPemFile string
 
 @description('API version for the GitHub API e.g. 2022-11-28')
 @minLength(1)
-param githubAPIVersion string = '2022-11-28'
+param gitHubApiVersion string = '2022-11-28'
 
 @description('True to use Test Data instead of calling the real API')
 param useTestData bool
@@ -56,11 +62,13 @@ module resources 'resources.bicep' = {
     resourceToken: resourceToken
     tags: tags
     location: location
+    gitHubClientId: gitHubClientId
+    gitHubInstallationId: gitHubInstallationId
     gitHubPemFile: gitHubPemFile
-    githubEnterpriseName: githubEnterpriseName
-    githubOrganizationName: githubOrganizationName
-    githubAPIVersion: githubAPIVersion
-    githubAPIScope: githubAPIScope
+    gitHubEnterpriseName: gitHubEnterpriseName
+    gitHubOrganizationName: gitHubOrganizationName
+    gitHubApiVersion: gitHubApiVersion
+    gitHubApiScope: gitHubApiScope
     teamNames: teamNames
     useTestData: useTestData
   }

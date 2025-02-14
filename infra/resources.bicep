@@ -1,18 +1,22 @@
 param name string = 'azurechat-demo'
 param resourceToken string
 
+param gitHubInstallationId string
+
+param gitHubClientId string
+
 @secure()
 param gitHubPemFile string
 
 param location string = resourceGroup().location
 
-param githubEnterpriseName string
+param gitHubEnterpriseName string
 
-param githubOrganizationName string
+param gitHubOrganizationName string
 
-param githubAPIVersion string
+param gitHubApiVersion string
 
-param githubAPIScope string
+param gitHubApiScope string
 
 param useTestData bool = false
 
@@ -157,24 +161,40 @@ resource copilotDataFunction 'Microsoft.Web/sites@2024-04-01' = {
           value: cosmosDbAccount.properties.documentEndpoint
         }
         {
-          name: 'GITHUB_TOKEN'
-          value: '@Microsoft.KeyVault(VaultName=${kv.name};SecretName=${kv::GITHUB_PEM.name})'
+          name: 'AZURE_COSMOSDB_ENDPOINT__clientId'
+          value: sfi.outputs.userManagedIdentityClientId
+        }
+        {
+          name: 'AZURE_COSMOSDB_ENDPOINT__credential'
+          value: 'managedidentity'
+        }
+        {
+          name: 'GITHUB_PEM'
+          value: '@Microsoft.KeyVault(VaultName=${kv.name};SecretName=${kv::GITHUB_PEM.name};ManagedIdentityClientId=${sfi.outputs.userManagedIdentityClientId};)'
+        }
+        {
+          name: 'GITHUB_CLIENT_ID'
+          value: gitHubClientId
+        }
+        {
+          name: 'GITHUB_INSTALLATION_ID'
+          value: gitHubInstallationId
         }
         {
           name: 'GITHUB_ENTERPRISE'
-          value: githubEnterpriseName
+          value: gitHubEnterpriseName
         }
         {
           name: 'GITHUB_ORGANIZATION'
-          value: githubOrganizationName
+          value: gitHubOrganizationName
         }
         {
           name: 'GITHUB_API_VERSION'
-          value: githubAPIVersion
+          value: gitHubApiVersion
         }
         {
           name: 'GITHUB_API_SCOPE'
-          value: githubAPIScope
+          value: gitHubApiScope
         }
         {
           name: 'GITHUB_METRICS__UseTestData'
@@ -219,24 +239,32 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
           value: cosmosDbAccount.properties.documentEndpoint
         }
         {
-          name: 'GITHUB_TOKEN'
-          value: '@Microsoft.KeyVault(VaultName=${kv.name};SecretName=${kv::GITHUB_PEM.name})'
+          name: 'GITHUB_PEM'
+          value: '@Microsoft.KeyVault(VaultName=${kv.name};SecretName=${kv::GITHUB_PEM.name};ManagedIdentityClientId=${sfi.outputs.userManagedIdentityClientId};)'
+        }
+        {
+          name: 'GITHUB_CLIENT_ID'
+          value: gitHubClientId
+        }
+        {
+          name: 'GITHUB_INSTALLATION_ID'
+          value: gitHubInstallationId
         }
         {
           name: 'GITHUB_ENTERPRISE'
-          value: githubEnterpriseName
+          value: gitHubEnterpriseName
         }
         {
           name: 'GITHUB_ORGANIZATION'
-          value: githubOrganizationName
+          value: gitHubOrganizationName
         }
         {
           name: 'GITHUB_API_VERSION'
-          value: githubAPIVersion
+          value: gitHubApiVersion
         }
         {
           name: 'GITHUB_API_SCOPE'
-          value: githubAPIScope
+          value: gitHubApiScope
         }
         {
           name: 'USER_ASSIGNED_IDENTITY_CLIENT_ID'
