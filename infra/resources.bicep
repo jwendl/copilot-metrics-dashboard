@@ -8,6 +8,16 @@ param gitHubClientId string
 @secure()
 param gitHubPemFile string
 
+param azureAdClientId string
+
+@secure()
+param azureAdClientSecret string
+
+param azureAdTenantId string
+
+@secure()
+param nextjsAuthSecret string
+
 param location string = resourceGroup().location
 
 param gitHubEnterpriseName string
@@ -27,7 +37,7 @@ param tags object = {}
 var shortName = take(toLower(replace(name, '-', '')), 5)
 
 var cosmosName = toLower('${name}-metrics-${resourceToken}')
-var webappName = toLower('${name}-dashboard-${resourceToken}')
+var webAppName = toLower('${name}-dashboard-${resourceToken}')
 var storageName = toLower('${shortName}${resourceToken}')
 var functionAppName = toLower('${name}-ingest-${resourceToken}')
 var appserviceName = toLower('${name}-dashboard-${resourceToken}')
@@ -206,7 +216,7 @@ resource copilotDataFunction 'Microsoft.Web/sites@2024-04-01' = {
 }
 
 resource webApp 'Microsoft.Web/sites@2023-12-01' = {
-  name: webappName
+  name: webAppName
   location: location
   tags: union(tags, { 'azd-service-name': 'frontend' })
   identity: {
@@ -266,6 +276,26 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
         {
           name: 'GITHUB_API_SCOPE'
           value: gitHubApiScope
+        }
+        {
+          name: 'AZURE_AD_CLIENT_ID'
+          value: azureAdClientId
+        }
+        {
+          name: 'AZURE_AD_CLIENT_SECRET'
+          value: '@Microsoft.KeyVault(SecretUri=https://${kv.name}.vault.azure.net/secrets/${kv::AZURE_AD_CLIENT_SECRET.name}/)'
+        }
+        {
+          name: 'AZURE_AD_TENANT_ID'
+          value: azureAdTenantId
+        }
+        {
+          name: 'AUTH_SECRET'
+          value: '@Microsoft.KeyVault(SecretUri=https://${kv.name}.vault.azure.net/secrets/${kv::NEXTJS_AUTH_SECRET.name}/)'
+        }
+        {
+          name: 'NEXTAUTH_URL'
+          value: 'https://${webAppName}.azurewebsites.net'
         }
         {
           name: 'USER_ASSIGNED_IDENTITY_CLIENT_ID'
@@ -356,6 +386,22 @@ resource kv 'Microsoft.KeyVault/vaults@2021-06-01-preview' = {
     properties: {
       contentType: 'text/plain'
       value: gitHubPemFile
+    }
+  }
+
+  resource AZURE_AD_CLIENT_SECRET 'secrets' = {
+    name: 'AZURE-AD-CLIENT-SECRET'
+    properties: {
+      contentType: 'text/plain'
+      value: azureAdClientSecret
+    }
+  }
+
+  resource NEXTJS_AUTH_SECRET 'secrets' = {
+    name: 'NEXTJS-AUTH-SECRET'
+    properties: {
+      contentType: 'text/plain'
+      value: nextjsAuthSecret
     }
   }
 }

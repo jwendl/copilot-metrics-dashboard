@@ -75,6 +75,10 @@ azd up
 azd up --debug
 ```
 
+## PEM FILE for GitHub
+
+Please use ``` azd env set-secret PEM_CONTENT ``` to point to an existing Key Vault that you only have network access to that has the PEM file content that you downloaded from the GitHub Apps portal.
+
 # Contributing
 
 This project welcomes contributions and suggestions. Most contributions require you to agree to a

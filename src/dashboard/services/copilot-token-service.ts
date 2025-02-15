@@ -1,5 +1,3 @@
-import { CosmosDbDiagnosticLevel } from '@azure/cosmos';
-import * as fs from 'fs';
 import * as jwt from 'jsonwebtoken';
 
 interface IGitHubTokenService {
@@ -21,10 +19,12 @@ export class GitHubTokenService implements IGitHubTokenService {
 
   private fetchGitHubAppToken(): string {
     const privateKey = process.env.GITHUB_PEM!;
+    const iat = Math.floor(Date.now() / 1000) - (3 * 60);
+    const exp = Math.floor(Date.now() / 1000) + (3 * 60);
 
     const payload = {
-      iat: Math.floor(Date.now() / 1000) - 60,
-      exp: Math.floor(Date.now() / 1000) + (10 * 60),
+      iat: iat,
+      exp: exp,
       iss: process.env.GITHUB_CLIENT_ID!
     };
 

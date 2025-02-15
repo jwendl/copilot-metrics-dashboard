@@ -17,6 +17,20 @@ param gitHubEnterpriseName string
 @minLength(1)
 param gitHubOrganizationName string
 
+@description('Azure AD Client Id')
+param azureAdClientId string
+
+@description('Azure AD Client Secret')
+@secure()
+param azureAdClientSecret string
+
+@description('Azure AD Tenant Id')
+param azureAdTenantId string
+
+@description('Next.js Auth Secret')
+@secure()
+param nextjsAuthSecret string
+
 @description('GitHub API scope: "enterprise" or "organization"')
 @allowed(['enterprise', 'organization'])
 param gitHubApiScope string
@@ -62,6 +76,10 @@ module resources 'resources.bicep' = {
     resourceToken: resourceToken
     tags: tags
     location: location
+    azureAdClientId: azureAdClientId
+    azureAdClientSecret: azureAdClientSecret
+    azureAdTenantId: azureAdTenantId
+    nextjsAuthSecret: nextjsAuthSecret
     gitHubClientId: gitHubClientId
     gitHubInstallationId: gitHubInstallationId
     gitHubPemFile: gitHubPemFile
