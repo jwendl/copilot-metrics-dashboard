@@ -1,3 +1,4 @@
+import { CosmosDbDiagnosticLevel } from '@azure/cosmos';
 import * as fs from 'fs';
 import * as jwt from 'jsonwebtoken';
 
@@ -14,14 +15,12 @@ export class GitHubTokenService implements IGitHubTokenService {
 
   async fetchTokenFromPem(): Promise<string> {
     const installationId = process.env.GITHUB_INSTALLATION_ID!;
-    const gitHubAppToken = this.fetchGitHubAppToken();
     const apiToken = await this.fetchGitHubApiToken(installationId);
     return apiToken;
   }
 
   private fetchGitHubAppToken(): string {
-    const pemFile = process.env.GITHUB_PEM!;
-    const privateKey = fs.readFileSync(pemFile, 'utf8');
+    const privateKey = process.env.GITHUB_PEM!;
 
     const payload = {
       iat: Math.floor(Date.now() / 1000) - 60,
@@ -34,7 +33,7 @@ export class GitHubTokenService implements IGitHubTokenService {
   }
 
   private async fetchGitHubApiToken(installationId: string): Promise<string> {
-    const requestUri = `/app/installations/${installationId}/access_tokens`;
+    const requestUri = `https://api.github.com/app/installations/${installationId}/access_tokens`;
 
     const response = await fetch(requestUri, {
       method: 'POST',

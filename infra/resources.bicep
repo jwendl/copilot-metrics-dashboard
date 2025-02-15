@@ -170,7 +170,7 @@ resource copilotDataFunction 'Microsoft.Web/sites@2024-04-01' = {
         }
         {
           name: 'GITHUB_PEM'
-          value: '@Microsoft.KeyVault(VaultName=${kv.name};SecretName=${kv::GITHUB_PEM.name};ManagedIdentityClientId=${sfi.outputs.userManagedIdentityClientId};)'
+          value: '@Microsoft.KeyVault(SecretUri=https://${kv.name}.vault.azure.net/secrets/${kv::GITHUB_PEM.name}/)'
         }
         {
           name: 'GITHUB_CLIENT_ID'
@@ -218,6 +218,7 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
   properties: {
     serverFarmId: appServicePlan.id
     virtualNetworkSubnetId: sfi.outputs.appSubnetResourceId
+    keyVaultReferenceIdentity: userManagedIdentityResourceId
     httpsOnly: true
     siteConfig: {
       linuxFxVersion: 'node|20-lts'
@@ -240,7 +241,7 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
         }
         {
           name: 'GITHUB_PEM'
-          value: '@Microsoft.KeyVault(VaultName=${kv.name};SecretName=${kv::GITHUB_PEM.name};ManagedIdentityClientId=${sfi.outputs.userManagedIdentityClientId};)'
+          value: '@Microsoft.KeyVault(SecretUri=https://${kv.name}.vault.azure.net/secrets/${kv::GITHUB_PEM.name}/)'
         }
         {
           name: 'GITHUB_CLIENT_ID'

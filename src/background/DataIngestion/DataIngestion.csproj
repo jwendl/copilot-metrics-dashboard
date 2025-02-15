@@ -33,6 +33,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Remove="TestData\metrics.json" />
+    <Content Include="local.settings.json" />
     <EmbeddedResource Include="TestData\metrics.json" />
   </ItemGroup>
 </Project>

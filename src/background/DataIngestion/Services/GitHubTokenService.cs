@@ -1,5 +1,8 @@
-﻿using Microsoft.IdentityModel.Tokens;
+﻿using Microsoft.CopilotDashboard.DataIngestion.Models;
+using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Security.Cryptography;
 
 namespace Microsoft.CopilotDashboard.DataIngestion.Services;
@@ -9,15 +12,14 @@ public interface IGitHubTokenService
 	Task<string> FetchTokenFromPem();
 }
 
-public class GitHubTokenService(HttpClient httpClient)
+public class GitHubTokenService()
 	: IGitHubTokenService
 {
 	public async Task<string> FetchTokenFromPem()
 	{
 		var installationId = Environment.GetEnvironmentVariable("GITHUB_INSTALLATION_ID")!;
-		var gitHubAppToken = FetchGitHubAppToken();
 		var apiToken = await FetchGitHubApiToken(installationId);
-		return apiToken;
+		return apiToken.Token;
 	}
 
 	private static string FetchGitHubAppToken()
@@ -32,8 +34,8 @@ public class GitHubTokenService(HttpClient httpClient)
 		var header = new JwtHeader(signingCredentials);
 		var payload = new JwtPayload
 		{
-			{ "iat", DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 60 },
-			{ "exp", DateTimeOffset.UtcNow.AddMinutes(10).ToUnixTimeSeconds() - (10 * 60) },
+			{ "iat", DateTimeOffset.UtcNow.AddMinutes(-3).ToUnixTimeSeconds() },
+			{ "exp", DateTimeOffset.UtcNow.AddMinutes(3).ToUnixTimeSeconds() },
 			{ "iss", Environment.GetEnvironmentVariable("GITHUB_CLIENT_ID")! }
 		};
 
@@ -43,12 +45,24 @@ public class GitHubTokenService(HttpClient httpClient)
 		return jwt;
 	}
 
-	private async Task<string> FetchGitHubApiToken(string installationId)
+	private static async Task<TokenResponse> FetchGitHubApiToken(string installationId)
 	{
+		var gitHubAppToken = FetchGitHubAppToken();
+		var apiVersion = Environment.GetEnvironmentVariable("GITHUB_API_VERSION");
+		var gitHubApiBaseUrl = Environment.GetEnvironmentVariable("GITHUB_API_BASEURL") ?? "https://api.github.com/";
 		var requestUri = $"/app/installations/{installationId}/access_tokens";
 
-		var response = await httpClient.PostAsync(requestUri, new StringContent(string.Empty));
-		var content = await response.Content.ReadAsStringAsync();
-		return content;
+		var internalHttpClient = new HttpClient
+		{
+			BaseAddress = new Uri(gitHubApiBaseUrl)
+		};
+		internalHttpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+		internalHttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", gitHubAppToken);
+		internalHttpClient.DefaultRequestHeaders.Add("X-GitHub-Api-Version", apiVersion);
+		internalHttpClient.DefaultRequestHeaders.Add("User-Agent", "GitHubCopilotDataIngestion");
+
+		var response = await internalHttpClient.PostAsync(requestUri, new StringContent(""));
+		var content = await response.Content.ReadFromJsonAsync<TokenResponse>();
+		return content!;
 	}
 }

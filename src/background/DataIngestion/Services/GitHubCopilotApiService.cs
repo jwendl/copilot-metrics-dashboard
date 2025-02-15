@@ -4,29 +4,11 @@ using System.Text.Json;
 
 namespace Microsoft.CopilotDashboard.DataIngestion.Services;
 
-public class GitHubCopilotApiService(HttpClient httpClient, IGitHubTokenService gitHubTokenService, ILogger<GitHubCopilotApiService> logger)
+public class GitHubCopilotApiService(IGitHubHttpClient gitHubHttpClient, IGitHubTokenService gitHubTokenService, ILogger<GitHubCopilotApiService> logger)
 {
 	public async Task<CopilotAssignedSeats> GetEnterpriseAssignedSeatsAsync(string enterprise)
 	{
-		//var token = Environment.GetEnvironmentVariable("GITHUB_TOKEN")!;
-		var token = await gitHubTokenService.FetchTokenFromPem();
-		return await GetEnterpriseAssignedSeatsAsync(enterprise, token);
-	}
-
-	public async Task<CopilotAssignedSeats> GetEnterpriseAssignedSeatsAsync(string enterprise, string token)
-	{
-		if (string.IsNullOrEmpty(token))
-		{
-			logger.LogError("Token is null or empty");
-			throw new ArgumentNullException(nameof(token));
-		}
-
-		if (httpClient.DefaultRequestHeaders.Contains("Authorization"))
-		{
-			httpClient.DefaultRequestHeaders.Remove("Authorization");
-		}
-		httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
-
+		var httpClient = await gitHubHttpClient.ConfigureHttpClientAsync();
 		var url = $"/enterprises/{enterprise}/copilot/billing/seats";
 		var allSeats = new List<Seat>();
 		while (url != null)
@@ -34,7 +16,7 @@ public class GitHubCopilotApiService(HttpClient httpClient, IGitHubTokenService 
 			var response = await httpClient.GetAsync(url);
 			if (!response.IsSuccessStatusCode)
 			{
-				logger.LogError($"Error fetching data: {response.StatusCode}", response.Content);
+				logger.LogError("Error fetching data: {responseStatusCode}{newLine}{responseContent}", response.StatusCode, Environment.NewLine, response.Content);
 				throw new HttpRequestException($"Error fetching data: {response.StatusCode}");
 			}
 			var content = await response.Content.ReadAsStringAsync();
@@ -64,17 +46,7 @@ public class GitHubCopilotApiService(HttpClient httpClient, IGitHubTokenService 
 
 	public async Task<CopilotAssignedSeats> GetOrganizationAssignedSeatsAsync(string organization, string token)
 	{
-		if (string.IsNullOrEmpty(token))
-		{
-			logger.LogError("Token is null or empty");
-			throw new ArgumentNullException(nameof(token));
-		}
-
-		if (httpClient.DefaultRequestHeaders.Contains("Authorization"))
-		{
-			httpClient.DefaultRequestHeaders.Remove("Authorization");
-		}
-		httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+		var httpClient = await gitHubHttpClient.ConfigureHttpClientAsync();
 
 		var url = $"/orgs/{organization}/copilot/billing/seats";
 		var allSeats = new List<Seat>();
@@ -83,7 +55,7 @@ public class GitHubCopilotApiService(HttpClient httpClient, IGitHubTokenService 
 			var response = await httpClient.GetAsync(url);
 			if (!response.IsSuccessStatusCode)
 			{
-				logger.LogError($"Error fetching data: {response.StatusCode}", response.Content);
+				logger.LogError("Error fetching data: {responseStatusCode}{newLine}{responseContent}", response.StatusCode, Environment.NewLine, response.Content);
 				throw new HttpRequestException($"Error fetching data: {response.StatusCode}");
 			}
 			var content = await response.Content.ReadAsStringAsync();

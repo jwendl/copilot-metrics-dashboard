@@ -12,7 +12,7 @@ internal enum MetricsType
 	Org
 }
 
-public class GitHubCopilotMetricsClient(HttpClient httpClient, IGitHubTokenService gitHubTokenService, ILogger<GitHubCopilotMetricsClient> logger)
+public class GitHubCopilotMetricsClient(IGitHubHttpClient gitHubHttpClient, ILogger<GitHubCopilotMetricsClient> logger)
 {
 	public Task<Metrics[]> GetCopilotMetricsForEnterpriseAsync(string? team)
 	{
@@ -38,12 +38,13 @@ public class GitHubCopilotMetricsClient(HttpClient httpClient, IGitHubTokenServi
 
 	private async Task<Metrics[]> GetMetrics(string requestUri, MetricsType type, string orgOrEnterpriseName, string? team = null)
 	{
+		var httpClient = await gitHubHttpClient.ConfigureHttpClientAsync();
 		var response = await httpClient.GetAsync(requestUri);
 		if (!response.IsSuccessStatusCode)
 		{
 			throw new HttpRequestException($"Error fetching data: {response.StatusCode}");
 		}
-		logger.LogInformation($"Fetched data from {requestUri}");
+		logger.LogInformation("Fetched data from {requestUri}", requestUri);
 		var metrics = AddInfo((await response.Content.ReadFromJsonAsync<Metrics[]>())!, type, orgOrEnterpriseName, team);
 		return metrics;
 	}

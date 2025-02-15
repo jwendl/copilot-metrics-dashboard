@@ -27,14 +27,14 @@ public class CopilotMetricsIngestion
     [CosmosDBOutput(databaseName: "platform-engineering", containerName: "metrics_history", Connection = "AZURE_COSMOSDB_ENDPOINT", CreateIfNotExists = true)]
     public async Task<List<Metrics>> Run([TimerTrigger("0 0 * * * *")] TimerInfo myTimer)
     {
-        _logger.LogInformation($"GitHubCopilotMetricsIngestion timer trigger function executed at: {DateTime.Now}");
+        _logger.LogInformation("GitHubCopilotMetricsIngestion timer trigger function executed at: {dateTimeNow}", DateTime.Now);
 
         var metrics = new List<Metrics>();
 
         metrics.AddRange(await ExtractMetrics());
 
         var teams = _options.Value.Teams;
-        if (teams != null && teams.Any())
+        if (teams != null && teams.Length != 0)
         {
             foreach (var team in teams)
             {
@@ -48,7 +48,7 @@ public class CopilotMetricsIngestion
 
         if (myTimer.ScheduleStatus is not null)
         {
-            _logger.LogInformation($"Finished ingestion. Next timer schedule at: {myTimer.ScheduleStatus.Next}");
+            _logger.LogInformation("Finished ingestion. Next timer schedule at: {myTimerScheduleStatusNext}", myTimer.ScheduleStatus.Next);
         }
         _logger.LogInformation($"Metrics count: {metrics.Count}");
         return metrics;
