@@ -19,6 +19,7 @@ export class GitHubTokenService implements IGitHubTokenService {
 
   private fetchGitHubAppToken(): string {
     const privateKey = process.env.GITHUB_PEM!;
+
     const iat = Math.floor(Date.now() / 1000) - (3 * 60);
     const exp = Math.floor(Date.now() / 1000) + (3 * 60);
 
