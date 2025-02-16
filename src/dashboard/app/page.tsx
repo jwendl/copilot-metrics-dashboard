@@ -9,7 +9,12 @@ export const dynamic = "force-dynamic";
 export default async function Home(props: IProps) {
   let id = "initial-dashboard";
   const session = await getServerSession();
-  const validUserEmails: string[] = ["juswen@microsoft.com", "altsang@microsoft.com", "katerayner@microsoft.com", "philcousins@microsoft.com", "dermille@microsoft.com", "phlucas@microsoft.com", "relghazi@microsoft.com", "macook@microsoft.com", "markmc@microsoft.com"];
+  const validUserEmails: string[] = [];
+  for (let i = 0; ; i++) {
+    const envVariable = process.env[`APPROVED_ACCOUNTS__${i}`];
+    if (envVariable === undefined) break;
+    validUserEmails.push(envVariable);
+  }
 
   if (!session) {
     redirect('/api/auth/signin');

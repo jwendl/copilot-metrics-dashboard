@@ -30,6 +30,8 @@ param gitHubApiScope string
 
 param useTestData bool = false
 
+param approvedAccounts array = []
+
 param teamNames array = []
 
 param tags object = {}
@@ -107,6 +109,13 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2020-06-01' = {
   }
   kind: 'linux'
 }
+
+var approvedAccountSettings = [
+  for (account, idx) in approvedAccounts: {
+    name: 'APPROVED_ACCOUNTS__${idx}'
+    value: account
+  }
+]
 
 var teamNameAppSettings = [
   for (teamName, idx) in teamNames: {
@@ -236,7 +245,7 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
       appCommandLine: 'next start'
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
-      appSettings: [
+      appSettings: union(approvedAccountSettings, [
         {
           name: 'AZURE_KEY_VAULT_NAME'
           value: keyVaultName
@@ -301,7 +310,7 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
           name: 'USER_ASSIGNED_IDENTITY_CLIENT_ID'
           value: sfi.outputs.userManagedIdentityClientId
         }
-      ]
+      ])
     }
   }
 
