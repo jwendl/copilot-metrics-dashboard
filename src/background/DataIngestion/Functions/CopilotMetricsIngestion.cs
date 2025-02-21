@@ -6,34 +6,19 @@ using Microsoft.CopilotDashboard.DataIngestion.Services;
 
 namespace Microsoft.CopilotDashboard.DataIngestion.Functions;
 
-public class CopilotMetricsIngestion
+public class CopilotMetricsIngestion(ILogger<CopilotMetricsIngestion> logger, GitHubCopilotMetricsClient metricsClient, IOptions<GithubMetricsApiOptions> options)
 {
-    private readonly ILogger _logger;
-    private readonly GitHubCopilotMetricsClient _metricsClient;
-    private readonly IOptions<GithubMetricsApiOptions> _options;
-
-    public CopilotMetricsIngestion(
-        ILogger<CopilotMetricsIngestion> logger,
-        GitHubCopilotMetricsClient metricsClient,
-        IOptions<GithubMetricsApiOptions> options)
-    {
-        _logger = logger;
-        _metricsClient = metricsClient;
-        _options = options;
-    }
-
-
-    [Function("GitHubCopilotMetricsIngestion")]
+	[Function("GitHubCopilotMetricsIngestion")]
     [CosmosDBOutput(databaseName: "platform-engineering", containerName: "metrics_history", Connection = "AZURE_COSMOSDB_ENDPOINT", CreateIfNotExists = true)]
     public async Task<List<Metrics>> Run([TimerTrigger("0 0 * * * *")] TimerInfo myTimer)
     {
-        _logger.LogInformation("GitHubCopilotMetricsIngestion timer trigger function executed at: {dateTimeNow}", DateTime.Now);
+        logger.LogInformation("GitHubCopilotMetricsIngestion timer trigger function executed at: {dateTimeNow}", DateTime.Now);
 
         var metrics = new List<Metrics>();
 
         metrics.AddRange(await ExtractMetrics());
 
-        var teams = _options.Value.Teams;
+        var teams = options.Value.Teams;
         if (teams != null && teams.Length != 0)
         {
             foreach (var team in teams)
@@ -48,15 +33,15 @@ public class CopilotMetricsIngestion
 
         if (myTimer.ScheduleStatus is not null)
         {
-            _logger.LogInformation("Finished ingestion. Next timer schedule at: {myTimerScheduleStatusNext}", myTimer.ScheduleStatus.Next);
+            logger.LogInformation("Finished ingestion. Next timer schedule at: {myTimerScheduleStatusNext}", myTimer.ScheduleStatus.Next);
         }
-        _logger.LogInformation($"Metrics count: {metrics.Count}");
+        logger.LogInformation("Metrics count: {metricsCount}", metrics.Count);
         return metrics;
     }
 
     private async Task<Metrics[]> ExtractMetrics(string? team = null)
     {
-        if (_options.Value.UseTestData)
+        if (options.Value.UseTestData)
         {
             return await LoadTestData(team);
         }
@@ -64,16 +49,16 @@ public class CopilotMetricsIngestion
         var scope = Environment.GetEnvironmentVariable("GITHUB_API_SCOPE");
         if (!string.IsNullOrWhiteSpace(scope) && scope == "enterprise")
         {
-            _logger.LogInformation("Fetching GitHub Copilot usage metrics for enterprise");
-            return await _metricsClient.GetCopilotMetricsForEnterpriseAsync(team);
+            logger.LogInformation("Fetching GitHub Copilot usage metrics for enterprise");
+            return await metricsClient.GetCopilotMetricsForEnterpriseAsync(team);
         }
 
-        _logger.LogInformation("Fetching GitHub Copilot usage metrics for organization");
-        return await _metricsClient.GetCopilotMetricsForOrganizationAsync(team);
+        logger.LogInformation("Fetching GitHub Copilot usage metrics for organization");
+        return await metricsClient.GetCopilotMetricsForOrganizationAsync(team);
     }
 
     private ValueTask<Metrics[]> LoadTestData(string? teamName)
     {
-        return _metricsClient.GetTestCopilotMetrics(teamName);
+        return metricsClient.GetTestCopilotMetrics(teamName);
     }
 }
