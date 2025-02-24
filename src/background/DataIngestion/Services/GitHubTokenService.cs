@@ -4,6 +4,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
+using System.Text;
 
 namespace Microsoft.CopilotDashboard.DataIngestion.Services;
 
@@ -25,8 +26,10 @@ public class GitHubTokenService()
 	private static string FetchGitHubAppToken()
 	{
 		var pemFile = Environment.GetEnvironmentVariable("GITHUB_PEM")!;
+		var pemFileDecodedBytes = Convert.FromBase64String(pemFile);
+		var pemFileDecoded = Encoding.UTF8.GetString(pemFileDecodedBytes);
 		var rsa = RSA.Create();
-		rsa.ImportFromPem(pemFile.ToCharArray());
+		rsa.ImportFromPem(pemFileDecoded.ToCharArray());
 
 		var securityKey = new RsaSecurityKey(rsa);
 		var signingCredentials = new SigningCredentials(securityKey, SecurityAlgorithms.RsaSha256);
