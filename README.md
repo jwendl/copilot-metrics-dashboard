@@ -77,7 +77,7 @@ azd up --debug
 
 ## PEM FILE for GitHub
 
-Please use ``` azd env set-secret PEM_CONTENT ``` to point to an existing Key Vault that you only have network access to that has the PEM file content that you downloaded from the GitHub Apps portal.
+Please use ``` $bytes=[System.IO.File]::ReadAllBytes('C:\\Source\\GitHub\\copilot-metrics-dashboard\github.pem') ``` and ``` [Convert]::ToBase64String($bytes) ``` to get a base64 encoded version of the PEM file to send into Key Vault.
 
 # Contributing
 
