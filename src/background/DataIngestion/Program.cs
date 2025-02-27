@@ -7,7 +7,8 @@ var host = new HostBuilder()
 	.ConfigureServices((ctx, services) =>
 	{
 		services.Configure<GithubMetricsApiOptions>(ctx.Configuration.GetSection("GITHUB_METRICS"));
-		services.AddHttpClient<IGitHubHttpClient, GitHubHttpClient>();
+		services.AddHttpClient();
+		services.AddSingleton<IGitHubHttpClient, GitHubHttpClient>();
 		services.AddSingleton<GitHubCopilotMetricsClient>();
 		services.AddSingleton<GitHubCopilotUsageClient>();
 		services.AddSingleton<GitHubCopilotApiService>();

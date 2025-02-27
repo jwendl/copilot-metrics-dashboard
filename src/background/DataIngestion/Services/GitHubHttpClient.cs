@@ -8,14 +8,14 @@ public interface IGitHubHttpClient
 	Task<HttpClient> ConfigureHttpClientAsync();
 }
 
-public class GitHubHttpClient(IServiceProvider serviceProvider, HttpClient httpClient)
+public class GitHubHttpClient(IServiceProvider serviceProvider, IHttpClientFactory httpClientFactory)
 	: IGitHubHttpClient
 {
 	public async Task<HttpClient> ConfigureHttpClientAsync()
 	{
+		var httpClient = httpClientFactory.CreateClient();
 		var gitHubTokenService = serviceProvider.GetRequiredService<IGitHubTokenService>();
 		var apiVersion = Environment.GetEnvironmentVariable("GITHUB_API_VERSION");
-		//var token = Environment.GetEnvironmentVariable("GITHUB_TOKEN");
 		var token = await gitHubTokenService.FetchTokenFromPem();
 		var gitHubApiBaseUrl = Environment.GetEnvironmentVariable("GITHUB_API_BASEURL") ?? "https://api.github.com/";
 

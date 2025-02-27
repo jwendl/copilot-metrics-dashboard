@@ -17,8 +17,7 @@ import { useRouter } from "next/navigation";
 
 export const DateFilter = () => {
   const today = new Date();
-  const lastThirtyOneDays = new Date(today);
-  lastThirtyOneDays.setDate(today.getDate() - 31);
+  const lastThirtyOneDays = new Date('02-01-2025');
 
   const parseDate = (dateStr: string | null) => {
     if (!dateStr) return null;
