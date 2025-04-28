@@ -37,19 +37,19 @@ public class CopilotAssignedSeats
     /// Gets or sets the list of seats.
     /// </summary>
     [JsonPropertyName("seats")]
-    public List<Seat> Seats { get; set; }
+    public List<Seat> Seats { get; set; } = [];
 
     /// <summary>
     /// Gets or sets the enterprise name.
     /// </summary>
     [JsonPropertyName("enterprise")]
-    public string Enterprise { get; set; }
+    public string Enterprise { get; set; } = default!;
 
     /// <summary>
     /// Gets or sets the organization name.
     /// </summary>
     [JsonPropertyName("organization")]
-    public string Organization { get; set; }
+    public string Organization { get; set; } = default!;
 
     /// <summary>
     /// Gets or sets the date and time of the last update.
@@ -92,7 +92,7 @@ public class Seat
     /// Gets or sets the pending cancellation date.
     /// </summary>
     [JsonPropertyName("pending_cancellation_date")]
-    public string PendingCancellationDate { get; set; }
+    public string PendingCancellationDate { get; set; } = default!;
 
     /// <summary>
     /// Gets or sets the date and time of the last activity.
@@ -110,25 +110,25 @@ public class Seat
     /// Gets or sets the type of plan associated with the seat.
     /// </summary>
     [JsonPropertyName("plan_type")]
-    public string PlanType { get; set; }
+    public string PlanType { get; set; } = default!;
 
     /// <summary>
     /// Gets or sets the user assigned to the seat.
     /// </summary>
     [JsonPropertyName("assignee")]
-    public User Assignee { get; set; }
+    public User Assignee { get; set; } = default!;
 
     /// <summary>
     /// Gets or sets the team that assigned the seat.
     /// </summary>
     [JsonPropertyName("assigning_team")]
-    public Team AssigningTeam { get; set; }
+    public Team AssigningTeam { get; set; } = default!;
 
     /// <summary>
     /// Gets or sets the organization associated with the seat.
     /// </summary>
     [JsonPropertyName("organization")]
-    public Organization Organization { get; set; }
+    public Organization Organization { get; set; } = default!;
 }
 
 

@@ -13,6 +13,7 @@ import { cosmosClient, cosmosConfiguration } from "./cosmos-db-service";
 import { ensureGitHubEnvConfig } from "./env-service";
 import { stringIsNullOrEmpty, applyTimeFrameLabel } from "../utils/helpers";
 import { sampleData } from "./sample-data";
+import { GitHubTokenService } from "./copilot-token-service";
 
 export interface IFilter {
   startDate?: Date;
@@ -65,7 +66,9 @@ export const getCopilotMetricsFromApi = async (filter: IFilter): Promise<
     return env;
   }
 
-  const { token, version } = env.response;
+  const { version } = env.response;
+  const gitHubTokenService = new GitHubTokenService(fetch);
+  const token: string = await gitHubTokenService.fetchTokenFromPem();
 
   try {
     if(filter.enterprise) {

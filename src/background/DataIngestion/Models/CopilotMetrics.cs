@@ -66,16 +66,16 @@ public class IdeCodeCompletions
     public int TotalEngagedUsers { get; set; }
 
     [JsonPropertyName("languages")]
-    public IdeCodeCompletionLanguage[] Languages { get; set; }
+    public IdeCodeCompletionLanguage[] Languages { get; set; } = [];
 
     [JsonPropertyName("editors")]
-    public IdeCodeCompletionEditor[] Editors { get; set; }
+    public IdeCodeCompletionEditor[] Editors { get; set; } = [];
 }
 
 public class IdeCodeCompletionLanguage
 {
     [JsonPropertyName("name")]
-    public string Name { get; set; }
+    public string Name { get; set; } = default!;
 
     [JsonPropertyName("total_engaged_users")]
     public int TotalEngagedUsers { get; set; }
@@ -84,19 +84,19 @@ public class IdeCodeCompletionLanguage
 public class IdeCodeCompletionEditor
 {
     [JsonPropertyName("name")]
-    public string Name { get; set; }
+    public string Name { get; set; } = default!;
 
     [JsonPropertyName("total_engaged_users")]
     public int TotalEngagedUsers { get; set; }
 
     [JsonPropertyName("models")]
-    public IdeCodeCompletionModel[] Models { get; set; }
+    public IdeCodeCompletionModel[] Models { get; set; } = [];
 }
 
 public class IdeCodeCompletionModel {
-    
+
     [JsonPropertyName("name")]
-    public string Name { get; set; }
+    public string Name { get; set; } = default!;
 
     [JsonPropertyName("is_custom_model")]
     public bool IsCustomModel { get; set; }
@@ -108,14 +108,14 @@ public class IdeCodeCompletionModel {
     public int TotalEngagedUsers { get; set; }
 
     [JsonPropertyName("languages")]
-    public IdeCodeCompletionModelLanguage[] Languages { get; set; }
+    public IdeCodeCompletionModelLanguage[] Languages { get; set; } = [];
 
 }
 
 public class IdeCodeCompletionModelLanguage
 {
     [JsonPropertyName("name")]
-    public string Name { get; set; }
+    public string Name { get; set; } = default!;
 
     [JsonPropertyName("total_engaged_users")]
     public int TotalEngagedUsers { get; set; }
@@ -137,27 +137,27 @@ public class IdeChat
 {
     [JsonPropertyName("total_engaged_users")]
     public int TotalEngagedUsers { get; set; }
-    
+
     [JsonPropertyName("editors")]
-    public IdeChatEditor[] Editors { get; set; }
+    public IdeChatEditor[] Editors { get; set; } = [];
 }
 
 public class IdeChatEditor
 {
     [JsonPropertyName("name")]
-    public string Name { get; set; }
+    public string Name { get; set; } = default!;
 
     [JsonPropertyName("total_engaged_users")]
     public int TotalEngagedUsers { get; set; }
 
     [JsonPropertyName("models")]
-    public IdeChatModel[] Models { get; set; }
+    public IdeChatModel[] Models { get; set; } = [];
 }
 
 public class IdeChatModel {
-    
+
     [JsonPropertyName("name")]
-    public string Name { get; set; }
+    public string Name { get; set; } = default!;
 
     [JsonPropertyName("is_custom_model")]
     public bool IsCustomModel { get; set; }
@@ -182,15 +182,15 @@ public class DotComChat
 {
     [JsonPropertyName("total_engaged_users")]
     public int TotalEngagedUsers { get; set; }
-    
+
     [JsonPropertyName("models")]
-    public DotComChatModel[] Models { get; set; }
+    public DotComChatModel[] Models { get; set; } = [];
 }
 
 public class DotComChatModel {
-    
+
     [JsonPropertyName("name")]
-    public string Name { get; set; }
+    public string Name { get; set; } = default!;
 
     [JsonPropertyName("is_custom_model")]
     public bool IsCustomModel { get; set; }
@@ -209,27 +209,27 @@ public class DotComPullRequest
 {
     [JsonPropertyName("total_engaged_users")]
     public int TotalEngagedUsers { get; set; }
-    
+
     [JsonPropertyName("repositories")]
-    public DotComPullRequestRepository[] Repositories { get; set; }
+    public DotComPullRequestRepository[] Repositories { get; set; } = [];
 }
 
 public class DotComPullRequestRepository
 {
     [JsonPropertyName("name")]
-    public string Name { get; set; }
+    public string Name { get; set; } = default!;
 
-    [JsonPropertyName("total_engaged_users")]
+	[JsonPropertyName("total_engaged_users")]
     public int TotalEngagedUsers { get; set; }
 
     [JsonPropertyName("models")]
-    public DotComPullRequestRepositoryModel[] Models { get; set; }
+    public DotComPullRequestRepositoryModel[] Models { get; set; } = [];
 }
 
 public class DotComPullRequestRepositoryModel
 {
     [JsonPropertyName("name")]
-    public string Name { get; set; }
+    public string Name { get; set; } = default!;
 
     [JsonPropertyName("is_custom_model")]
     public bool IsCustomModel { get; set; }

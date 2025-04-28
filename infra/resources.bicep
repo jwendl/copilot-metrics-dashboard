@@ -1,20 +1,36 @@
 param name string = 'azurechat-demo'
 param resourceToken string
 
-param location string = resourceGroup().location
+param gitHubInstallationId string
+
+param gitHubClientId string
 
 @secure()
-param githubToken string
+param gitHubPemFile string
 
-param githubEnterpriseName string
+param azureAdClientId string
 
-param githubOrganizationName string
+@secure()
+param azureAdClientSecret string
 
-param githubAPIVersion string
+param azureAdTenantId string
 
-param githubAPIScope string
+@secure()
+param nextjsAuthSecret string
+
+param location string = resourceGroup().location
+
+param gitHubEnterpriseName string
+
+param gitHubOrganizationName string
+
+param gitHubApiVersion string
+
+param gitHubApiScope string
 
 param useTestData bool = false
+
+param approvedAccounts array = []
 
 param teamNames array = []
 
@@ -23,7 +39,7 @@ param tags object = {}
 var shortName = take(toLower(replace(name, '-', '')), 5)
 
 var cosmosName = toLower('${name}-metrics-${resourceToken}')
-var webappName = toLower('${name}-dashboard-${resourceToken}')
+var webAppName = toLower('${name}-dashboard-${resourceToken}')
 var storageName = toLower('${shortName}${resourceToken}')
 var functionAppName = toLower('${name}-ingest-${resourceToken}')
 var appserviceName = toLower('${name}-dashboard-${resourceToken}')
@@ -34,19 +50,48 @@ var logWorkspaceName = toLower('${name}-la-${resourceToken}')
 var appinsightsName = toLower('${name}-appi-${resourceToken}')
 var diagnosticSettingName = 'AppServiceConsoleLogs'
 
-var keyVaultSecretsOfficerRole = subscriptionResourceId(
-  'Microsoft.Authorization/roleDefinitions',
-  'b86a8fe4-44ce-4948-aee5-eccb2c155cd7'
-)
-var storageDataWriterRole = subscriptionResourceId(
-  'Microsoft.Authorization/roleDefinitions',
-  'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
-)
+var keyVaultPrivateEndpointName = toLower('${name}-kvpe-${resourceToken}')
+var keyVaultPrivateDnsZoneGroupName = toLower('${name}-kvpdns-${resourceToken}')
+var funBlobPrivateEndpointName = toLower('${name}-blobpe-${resourceToken}')
+var funBlobPrivateDnsZoneGroupName = toLower('${name}-blobpdns-${resourceToken}')
+var cosmosPrivateEndpointName = toLower('${name}-cosmospe-${resourceToken}')
+var cosmosPrivateDnsZoneGroupName = toLower('${name}-cosmospdns-${resourceToken}')
+
+//'/${subscription().id}/resourceGroups/${resourceGroup().name}/providers/Microsoft.DocumentDB/databaseAccounts/${cosmosDbAccount.name}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002'
+resource cosmosDbReaderRoleDefinition 'Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions@2024-11-15' existing = {
+  parent: cosmosDbAccount
+  name: '00000000-0000-0000-0000-000000000001'
+}
+
+//'/${subscription().id}/resourceGroups/${resourceGroup().name}/providers/Microsoft.DocumentDB/databaseAccounts/${cosmosDbAccount.name}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000001'
+resource cosmosDbContributorRoleDefinition 'Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions@2024-11-15' existing = {
+  parent: cosmosDbAccount
+  name: '00000000-0000-0000-0000-000000000002'
+}
+
+resource keyVaultSecretsOfficerRoleDefinition 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
+  name: 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7'
+}
+
+resource storageDataWriterRoleDefinition 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
+  name: 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+}
 
 var databaseName = 'platform-engineering'
 var orgContainerName = 'history'
 var metricsContainerName = 'metrics_history'
 var seatsContainerName = 'seats_history'
+var userManagedIdentityResourceId = resourceId(resourceGroup().name, 'Microsoft.ManagedIdentity/userAssignedIdentities', toLower('${name}-umi-${resourceToken}'))
+
+module sfi 'sfi.bicep' = {
+  name: 'sfi-deployment'
+  params: {
+    name: name
+    location: location
+    resourceToken: resourceToken
+    globalLocation: 'global'
+  }
+}
 
 resource appServicePlan 'Microsoft.Web/serverfarms@2020-06-01' = {
   name: appserviceName
@@ -65,6 +110,13 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2020-06-01' = {
   kind: 'linux'
 }
 
+var approvedAccountSettings = [
+  for (account, idx) in approvedAccounts: {
+    name: 'APPROVED_ACCOUNTS__${idx}'
+    value: account
+  }
+]
+
 var teamNameAppSettings = [
   for (teamName, idx) in teamNames: {
     name: 'GITHUB_METRICS__Teams__${idx}'
@@ -72,14 +124,21 @@ var teamNameAppSettings = [
   }
 ]
 
-resource copilotDataFunction 'Microsoft.Web/sites@2023-12-01' = {
+resource copilotDataFunction 'Microsoft.Web/sites@2024-04-01' = {
   name: functionAppName
   tags: union(tags, { 'azd-service-name': 'ingestion' })
   kind: 'functionapp'
-  identity: { type: 'SystemAssigned' }
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${userManagedIdentityResourceId}': {}
+    }
+  }
   location: location
   properties: {
     serverFarmId: appServicePlan.id
+    virtualNetworkSubnetId: sfi.outputs.funSubnetResourceId
+    keyVaultReferenceIdentity: userManagedIdentityResourceId
     siteConfig: {
       alwaysOn: true
       linuxFxVersion: 'DOTNET-ISOLATED|8.0'
@@ -90,7 +149,23 @@ resource copilotDataFunction 'Microsoft.Web/sites@2023-12-01' = {
         }
         {
           name: 'AzureWebJobsStorage__accountname'
-          value: storage.name
+          value: functionsStorage.name
+        }
+        {          
+          name: 'AzureWebJobsStorage__clientId'          
+          value: sfi.outputs.userManagedIdentityClientId
+        }
+        {          
+          name: 'AzureWebJobsStorage__credential'          
+          value: 'managedidentity'
+        }
+        {
+          name: 'AzureWebJobsStorage__blobServiceUri'
+          value: 'https://${functionsStorage.name}.blob.${az.environment().suffixes.storage}'
+        }
+        {
+          name: 'AzureWebJobsStorage__queueServiceUri'
+          value: 'https://${functionsStorage.name}.queue.${az.environment().suffixes.storage}'
         }
         {
           name: 'FUNCTIONS_EXTENSION_VERSION'
@@ -105,24 +180,40 @@ resource copilotDataFunction 'Microsoft.Web/sites@2023-12-01' = {
           value: cosmosDbAccount.properties.documentEndpoint
         }
         {
-          name: 'GITHUB_TOKEN'
-          value: '@Microsoft.KeyVault(VaultName=${kv.name};SecretName=${kv::GITHUB_TOKEN.name})'
+          name: 'AZURE_COSMOSDB_ENDPOINT__clientId'
+          value: sfi.outputs.userManagedIdentityClientId
+        }
+        {
+          name: 'AZURE_COSMOSDB_ENDPOINT__credential'
+          value: 'managedidentity'
+        }
+        {
+          name: 'GITHUB_PEM'
+          value: '@Microsoft.KeyVault(SecretUri=https://${kv.name}.vault.azure.net/secrets/${kv::GITHUB_PEM.name}/)'
+        }
+        {
+          name: 'GITHUB_CLIENT_ID'
+          value: gitHubClientId
+        }
+        {
+          name: 'GITHUB_INSTALLATION_ID'
+          value: gitHubInstallationId
         }
         {
           name: 'GITHUB_ENTERPRISE'
-          value: githubEnterpriseName
+          value: gitHubEnterpriseName
         }
         {
           name: 'GITHUB_ORGANIZATION'
-          value: githubOrganizationName
+          value: gitHubOrganizationName
         }
         {
           name: 'GITHUB_API_VERSION'
-          value: githubAPIVersion
+          value: gitHubApiVersion
         }
         {
           name: 'GITHUB_API_SCOPE'
-          value: githubAPIScope
+          value: gitHubApiScope
         }
         {
           name: 'GITHUB_METRICS__UseTestData'
@@ -133,12 +224,20 @@ resource copilotDataFunction 'Microsoft.Web/sites@2023-12-01' = {
   }
 }
 
-resource webApp 'Microsoft.Web/sites@2020-06-01' = {
-  name: webappName
+resource webApp 'Microsoft.Web/sites@2023-12-01' = {
+  name: webAppName
   location: location
   tags: union(tags, { 'azd-service-name': 'frontend' })
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${userManagedIdentityResourceId}': {}
+    }
+  }
   properties: {
     serverFarmId: appServicePlan.id
+    virtualNetworkSubnetId: sfi.outputs.appSubnetResourceId
+    keyVaultReferenceIdentity: userManagedIdentityResourceId
     httpsOnly: true
     siteConfig: {
       linuxFxVersion: 'node|20-lts'
@@ -146,7 +245,7 @@ resource webApp 'Microsoft.Web/sites@2020-06-01' = {
       appCommandLine: 'next start'
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
-      appSettings: [
+      appSettings: union(approvedAccountSettings, [
         {
           name: 'AZURE_KEY_VAULT_NAME'
           value: keyVaultName
@@ -160,29 +259,60 @@ resource webApp 'Microsoft.Web/sites@2020-06-01' = {
           value: cosmosDbAccount.properties.documentEndpoint
         }
         {
-          name: 'GITHUB_TOKEN'
-          value: '@Microsoft.KeyVault(VaultName=${kv.name};SecretName=${kv::GITHUB_TOKEN.name})'
+          name: 'GITHUB_PEM'
+          value: '@Microsoft.KeyVault(SecretUri=https://${kv.name}.vault.azure.net/secrets/${kv::GITHUB_PEM.name}/)'
+        }
+        {
+          name: 'GITHUB_CLIENT_ID'
+          value: gitHubClientId
+        }
+        {
+          name: 'GITHUB_INSTALLATION_ID'
+          value: gitHubInstallationId
         }
         {
           name: 'GITHUB_ENTERPRISE'
-          value: githubEnterpriseName
+          value: gitHubEnterpriseName
         }
         {
           name: 'GITHUB_ORGANIZATION'
-          value: githubOrganizationName
+          value: gitHubOrganizationName
         }
         {
           name: 'GITHUB_API_VERSION'
-          value: githubAPIVersion
+          value: gitHubApiVersion
         }
         {
           name: 'GITHUB_API_SCOPE'
-          value: githubAPIScope
+          value: gitHubApiScope
         }
-      ]
+        {
+          name: 'AZURE_AD_CLIENT_ID'
+          value: azureAdClientId
+        }
+        {
+          name: 'AZURE_AD_CLIENT_SECRET'
+          value: '@Microsoft.KeyVault(SecretUri=https://${kv.name}.vault.azure.net/secrets/${kv::AZURE_AD_CLIENT_SECRET.name}/)'
+        }
+        {
+          name: 'AZURE_AD_TENANT_ID'
+          value: azureAdTenantId
+        }
+        {
+          name: 'AUTH_SECRET'
+          value: '@Microsoft.KeyVault(SecretUri=https://${kv.name}.vault.azure.net/secrets/${kv::NEXTJS_AUTH_SECRET.name}/)'
+        }
+        {
+          name: 'NEXTAUTH_URL'
+          value: 'https://${webAppName}.azurewebsites.net'
+        }
+        {
+          name: 'USER_ASSIGNED_IDENTITY_CLIENT_ID'
+          value: sfi.outputs.userManagedIdentityClientId
+        }
+      ])
     }
   }
-  identity: { type: 'SystemAssigned' }
 
   resource configLogs 'config' = {
     name: 'logs'
@@ -227,29 +357,23 @@ resource webDiagnosticSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01
   }
 }
 
-resource kvFunctionAppPermissions 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = {
-  name: guid(kv.id, copilotDataFunction.name, keyVaultSecretsOfficerRole)
+resource kvWebAppPermissions 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(kv.id, webApp.name, keyVaultSecretsOfficerRoleDefinition.id)
   scope: kv
   properties: {
-    principalId: copilotDataFunction.identity.principalId
+    principalId: sfi.outputs.userManagedIdentityPrincipalId
     principalType: 'ServicePrincipal'
-    roleDefinitionId: keyVaultSecretsOfficerRole
-  }
-}
-
-resource kvWebAppPermissions 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = {
-  name: guid(kv.id, webApp.name, keyVaultSecretsOfficerRole)
-  scope: kv
-  properties: {
-    principalId: webApp.identity.principalId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: keyVaultSecretsOfficerRole
+    roleDefinitionId: keyVaultSecretsOfficerRoleDefinition.id
   }
 }
 
 resource kv 'Microsoft.KeyVault/vaults@2021-06-01-preview' = {
   name: keyVaultName
   location: location
+  tags: {
+    PurgeProtectionEnabledforAKV_Exemption: 'true'
+    VirtualNetworkEndPointAKV_Exemption: 'true'
+  }
   properties: {
     sku: {
       family: 'A'
@@ -260,13 +384,33 @@ resource kv 'Microsoft.KeyVault/vaults@2021-06-01-preview' = {
     enabledForDeployment: false
     enabledForDiskEncryption: true
     enabledForTemplateDeployment: false
+    networkAcls: {
+      bypass: 'AzureServices'
+      defaultAction: 'Deny'
+    }
   }
 
-  resource GITHUB_TOKEN 'secrets' = {
-    name: 'GITHUB-TOKEN'
+  resource GITHUB_PEM 'secrets' = {
+    name: 'GITHUB-PEM'
     properties: {
       contentType: 'text/plain'
-      value: githubToken
+      value: gitHubPemFile
+    }
+  }
+
+  resource AZURE_AD_CLIENT_SECRET 'secrets' = {
+    name: 'AZURE-AD-CLIENT-SECRET'
+    properties: {
+      contentType: 'text/plain'
+      value: azureAdClientSecret
+    }
+  }
+
+  resource NEXTJS_AUTH_SECRET 'secrets' = {
+    name: 'NEXTJS-AUTH-SECRET'
+    properties: {
+      contentType: 'text/plain'
+      value: nextjsAuthSecret
     }
   }
 }
@@ -350,8 +494,8 @@ resource cosmosDbDataContributor 'Microsoft.DocumentDB/databaseAccounts/sqlRoleA
   name: guid(cosmosDbAccount.id, copilotDataFunction.name, 'DataContributor')
   parent: cosmosDbAccount
   properties: {
-    principalId: copilotDataFunction.identity.principalId
-    roleDefinitionId: '/${subscription().id}/resourceGroups/${resourceGroup().name}/providers/Microsoft.DocumentDB/databaseAccounts/${cosmosDbAccount.name}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002'
+    principalId: sfi.outputs.userManagedIdentityPrincipalId
+    roleDefinitionId: cosmosDbContributorRoleDefinition.id
     scope: cosmosDbAccount.id
   }
 }
@@ -360,29 +504,155 @@ resource cosmosDbDataReader 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssign
   name: guid(cosmosDbAccount.id, webApp.name, 'DataReader')
   parent: cosmosDbAccount
   properties: {
-    principalId: webApp.identity.principalId
-    roleDefinitionId: '/${subscription().id}/resourceGroups/${resourceGroup().name}/providers/Microsoft.DocumentDB/databaseAccounts/${cosmosDbAccount.name}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000001'
+    principalId: sfi.outputs.userManagedIdentityPrincipalId
+    roleDefinitionId: cosmosDbReaderRoleDefinition.id
     scope: cosmosDbAccount.id
   }
 }
 
-resource storage 'Microsoft.Storage/storageAccounts@2023-04-01' = {
+resource functionsStorage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageName
   kind: 'StorageV2'
   sku: { name: 'Standard_LRS' }
   location: location
   properties: {
     allowBlobPublicAccess: false
+    allowSharedKeyAccess: false
+    minimumTlsVersion: 'TLS1_2'
+    supportsHttpsTrafficOnly: true
+    encryption: {
+      keySource: 'Microsoft.Storage'
+      requireInfrastructureEncryption: true
+      services: {
+        blob: {
+          enabled: true
+          keyType: 'Account'
+        }
+        table: {
+          enabled: true
+          keyType: 'Account'
+        }
+      }
+    }
+    keyPolicy: {
+      keyExpirationPeriodInDays: 7
+    }
+    networkAcls: {
+      defaultAction: 'Deny'
+      bypass: 'AzureServices'
+    }
   }
 }
 
 resource storageDataContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storage.id, copilotDataFunction.name, 'DataContributor')
-  scope: storage
+  name: guid(functionsStorage.id, copilotDataFunction.name, 'DataContributor')
+  scope: functionsStorage
   properties: {
-    principalId: copilotDataFunction.identity.principalId
+    principalId: sfi.outputs.userManagedIdentityPrincipalId
     principalType: 'ServicePrincipal'
-    roleDefinitionId: storageDataWriterRole
+    roleDefinitionId: storageDataWriterRoleDefinition.id
+  }
+}
+
+
+resource keyVaultPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
+  name: keyVaultPrivateEndpointName
+  location: location
+  properties: {
+    subnet: {
+      id: sfi.outputs.vaultSubnetResourceId
+    }
+    privateLinkServiceConnections: [
+      {
+        name: 'KeyVaultPrivateLinkConnection'
+        properties: {
+          privateLinkServiceId: kv.id
+          groupIds: [ 'vault' ]
+        }
+      }
+    ]
+  }
+
+  resource keyVaultPrivateDnsZoneGroup 'privateDnsZoneGroups' = {
+    name: keyVaultPrivateDnsZoneGroupName
+    properties: {
+      privateDnsZoneConfigs: [
+        {
+          name: 'config'
+          properties: { privateDnsZoneId: sfi.outputs.vaultPrivateDnsZoneResourceId }
+        }
+      ]
+    }
+  }
+}
+
+resource storagePrivateEndpointBlob 'Microsoft.Network/privateEndpoints@2024-05-01' = {
+  name: funBlobPrivateEndpointName
+  location: location
+  properties: {
+    privateLinkServiceConnections: [
+      { 
+        name: 'BlobStoragePrivateLinkConnection'
+        properties: {
+          groupIds: [
+            'blob'
+          ]
+          privateLinkServiceId: functionsStorage.id
+        }
+      }
+    ]
+    subnet: {
+      id: sfi.outputs.funStorageSubnetResourceId
+    }
+  }
+
+  resource pvtEndpointDnsGroup 'privateDnsZoneGroups' = {
+    name: funBlobPrivateDnsZoneGroupName
+    properties: {
+      privateDnsZoneConfigs: [
+        {
+          name: 'ConfigStoragePrivateEndpoint'
+          properties: {
+            privateDnsZoneId: sfi.outputs.blobPrivateDnsZoneResourceId
+          }
+        }
+      ]
+    }
+  }
+}
+
+resource cosmosPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
+  name: cosmosPrivateEndpointName
+  location: location
+  properties: {
+    privateLinkServiceConnections: [
+      { 
+        name: 'CosmosPrivateLinkConnection'
+        properties: {
+          groupIds: [
+            'sql'
+          ]
+          privateLinkServiceId: cosmosDbAccount.id
+        }
+      }
+    ]
+    subnet: {
+      id: sfi.outputs.cosmosDbSubnetResourceId
+    }
+  }
+
+  resource cosmosEndpointDnsGroup 'privateDnsZoneGroups' = {
+    name: cosmosPrivateDnsZoneGroupName
+    properties: {
+      privateDnsZoneConfigs: [
+        {
+          name: 'CosmosPrivateEndpoint'
+          properties: {
+            privateDnsZoneId: sfi.outputs.cosmosDbPrivateDnsZoneResourceId
+          }
+        }
+      ]
+    }
   }
 }
 

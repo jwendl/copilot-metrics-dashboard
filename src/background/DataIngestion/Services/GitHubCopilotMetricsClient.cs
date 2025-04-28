@@ -1,88 +1,79 @@
-﻿using System.Net.Http.Json;
-using System.Text.Json;
-using Microsoft.CopilotDashboard.DataIngestion.Functions;
+﻿using Microsoft.CopilotDashboard.DataIngestion.Functions;
 using Microsoft.CopilotDashboard.DataIngestion.Models;
 using Microsoft.Extensions.Logging;
+using System.Net.Http.Json;
+using System.Text.Json;
 
-namespace Microsoft.CopilotDashboard.DataIngestion.Services
+namespace Microsoft.CopilotDashboard.DataIngestion.Services;
+
+internal enum MetricsType
 {
-    internal enum MetricsType
-    {
-        Ent,
-        Org
-    }
+	Ent,
+	Org
+}
 
-    public class GitHubCopilotMetricsClient
-    {
-        private readonly HttpClient _httpClient;
-        private readonly ILogger _logger;
+public class GitHubCopilotMetricsClient(IGitHubHttpClient gitHubHttpClient, ILogger<GitHubCopilotMetricsClient> logger)
+{
+	public Task<Metrics[]> GetCopilotMetricsForEnterpriseAsync(string? team)
+	{
+		var enterprise = Environment.GetEnvironmentVariable("GITHUB_ENTERPRISE")!;
 
-        public GitHubCopilotMetricsClient(HttpClient httpClient, ILogger<GitHubCopilotMetricsClient> logger)
-        {
-            _httpClient = httpClient;
-            _logger = logger;
-        }
+		var requestUri = string.IsNullOrWhiteSpace(team)
+			? $"/enterprises/{enterprise}/copilot/metrics"
+			: $"/enterprises/{enterprise}/team/{team}/copilot/metrics";
 
-        public Task<Metrics[]> GetCopilotMetricsForEnterpriseAsync(string? team)
-        {
-            var enterprise = Environment.GetEnvironmentVariable("GITHUB_ENTERPRISE")!;
+		return GetMetrics(requestUri, MetricsType.Ent, enterprise, team);
+	}
 
-            var requestUri = string.IsNullOrWhiteSpace(team)
-                ? $"/enterprises/{enterprise}/copilot/metrics"
-                : $"/enterprises/{enterprise}/team/{team}/copilot/metrics";
+	public Task<Metrics[]> GetCopilotMetricsForOrganizationAsync(string? team)
+	{
+		var organization = Environment.GetEnvironmentVariable("GITHUB_ORGANIZATION")!;
 
-            return GetMetrics(requestUri, MetricsType.Ent, enterprise, team);
-        }
+		var requestUri = string.IsNullOrWhiteSpace(team)
+			? $"/orgs/{organization}/copilot/metrics"
+			: $"/orgs/{organization}/team/{team}/copilot/metrics";
 
-        public Task<Metrics[]> GetCopilotMetricsForOrganizationAsync(string? team)
-        {
-            var organization = Environment.GetEnvironmentVariable("GITHUB_ORGANIZATION")!;
+		return GetMetrics(requestUri, MetricsType.Org, organization, team);
+	}
 
-            var requestUri = string.IsNullOrWhiteSpace(team)
-                ? $"/orgs/{organization}/copilot/metrics"
-                : $"/orgs/{organization}/team/{team}/copilot/metrics";
+	private async Task<Metrics[]> GetMetrics(string requestUri, MetricsType type, string orgOrEnterpriseName, string? team = null)
+	{
+		var httpClient = await gitHubHttpClient.ConfigureHttpClientAsync();
+		var response = await httpClient.GetAsync(requestUri);
+		if (!response.IsSuccessStatusCode)
+		{
+			throw new HttpRequestException($"Error fetching data: {response.StatusCode}");
+		}
+		logger.LogInformation("Fetched data from {requestUri}", requestUri);
+		var metrics = AddInfo((await response.Content.ReadFromJsonAsync<Metrics[]>())!, type, orgOrEnterpriseName, team);
+		return metrics;
+	}
 
-            return GetMetrics(requestUri, MetricsType.Org, organization, team);
-        }
+	public async ValueTask<Metrics[]> GetTestCopilotMetrics(string? team)
+	{
+		await using var reader = typeof(CopilotMetricsIngestion)
+				.Assembly
+				.GetManifestResourceStream(
+					"Microsoft.CopilotDashboard.DataIngestion.TestData.metrics.json")!;
 
-        private async Task<Metrics[]> GetMetrics(string requestUri, MetricsType type, string orgOrEnterpriseName, string? team = null)
-        {
-            var response = await _httpClient.GetAsync(requestUri);
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new HttpRequestException($"Error fetching data: {response.StatusCode}");
-            }
-            _logger.LogInformation($"Fetched data from {requestUri}");
-            var metrics = AddInfo((await response.Content.ReadFromJsonAsync<Metrics[]>())!, type, orgOrEnterpriseName, team);
-            return metrics;
-        }
+		return AddInfo((await JsonSerializer.DeserializeAsync<Metrics[]>(reader))!, MetricsType.Org, "test", team);
+	}
 
-        public async ValueTask<Metrics[]> GetTestCopilotMetrics(string? team)
-        {
-            await using var reader = typeof(CopilotMetricsIngestion)
-                    .Assembly
-                    .GetManifestResourceStream(
-                        "Microsoft.CopilotDashboard.DataIngestion.TestData.metrics.json")!;
+	private static Metrics[] AddInfo(Metrics[] metrics, MetricsType type, string orgOrEnterpriseName, string? team = null)
+	{
+		foreach (var metric in metrics)
+		{
+			metric.Team = team;
+			if (type == MetricsType.Ent)
+			{
+				metric.Enterprise = orgOrEnterpriseName;
+			}
+			else
+			{
+				metric.Organization = orgOrEnterpriseName;
+			}
+		}
 
-            return AddInfo((await JsonSerializer.DeserializeAsync<Metrics[]>(reader))!, MetricsType.Org, "test", team);
-        }
-
-        private Metrics[] AddInfo(Metrics[] metrics, MetricsType type, string orgOrEnterpriseName, string? team = null)
-        {
-            foreach (var metric in metrics)
-            {
-                metric.Team = team;
-                if(type == MetricsType.Ent)
-                {
-                    metric.Enterprise = orgOrEnterpriseName;
-                }
-                else
-                {
-                    metric.Organization = orgOrEnterpriseName;
-                }
-            }
-
-            return metrics;
-        }
-    }
+		return metrics;
+	}
 }

@@ -17,6 +17,7 @@
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore" Version="1.3.2" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Timer" Version="4.3.1" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Sdk" Version="1.18.1" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.4.0" />
   </ItemGroup>
   <ItemGroup>
     <None Update="host.json">
@@ -32,6 +33,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Remove="TestData\metrics.json" />
+    <Content Include="local.settings.json" />
     <EmbeddedResource Include="TestData\metrics.json" />
   </ItemGroup>
 </Project>

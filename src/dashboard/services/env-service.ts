@@ -3,7 +3,7 @@ import { ServerActionResponse } from "@/features/common/server-action-response";
 interface GitHubConfig {
   organization: string;
   enterprise: string;
-  token: string;
+  pem: string;
   version: string;
   scope: string;
 }
@@ -16,7 +16,7 @@ interface FeaturesConfig {
 export const ensureGitHubEnvConfig = (): ServerActionResponse<GitHubConfig> => {
   const organization = process.env.GITHUB_ORGANIZATION;
   const enterprise = process.env.GITHUB_ENTERPRISE;
-  const token = process.env.GITHUB_TOKEN;
+  const pem = process.env.GITHUB_PEM;
   const version = process.env.GITHUB_API_VERSION;
   let scope = process.env.GITHUB_API_SCOPE;
 
@@ -44,12 +44,12 @@ export const ensureGitHubEnvConfig = (): ServerActionResponse<GitHubConfig> => {
     };
   }
 
-  if (stringIsNullOrEmpty(token)) {
+  if (stringIsNullOrEmpty(pem)) {
     return {
       status: "ERROR",
       errors: [
         {
-          message: "Missing required environment variable for GitHub token",
+          message: "Missing required environment variable for GitHub PEM file",
         },
       ],
     };
@@ -90,7 +90,7 @@ export const ensureGitHubEnvConfig = (): ServerActionResponse<GitHubConfig> => {
     response: {
       organization,
       enterprise,
-      token,
+      pem,
       version,
       scope,
     },

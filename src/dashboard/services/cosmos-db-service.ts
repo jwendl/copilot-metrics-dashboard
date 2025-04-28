@@ -10,7 +10,9 @@ export const cosmosClient = () => {
     throw new Error("Missing required environment variable for CosmosDB endpoint");
   }
 
-  const credential = new DefaultAzureCredential();
+  const credential = new DefaultAzureCredential({
+    managedIdentityClientId: process.env.USER_ASSIGNED_IDENTITY_CLIENT_ID,
+  });
   return new CosmosClient({ endpoint, aadCredentials: credential });
 };
 

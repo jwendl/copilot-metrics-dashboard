@@ -75,6 +75,10 @@ azd up
 azd up --debug
 ```
 
+## PEM FILE for GitHub
+
+Please use ``` $bytes=[System.IO.File]::ReadAllBytes('C:\\Source\\GitHub\\copilot-metrics-dashboard\github.pem') ``` and ``` [Convert]::ToBase64String($bytes) ``` to get a base64 encoded version of the PEM file to send into Key Vault.
+
 # Contributing
 
 This project welcomes contributions and suggestions. Most contributions require you to agree to a
